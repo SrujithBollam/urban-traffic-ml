@@ -7,13 +7,7 @@ __pycache__/
 .env
 *.env
 
-# Data
-data/raw/toronto_speed_2020_2024.csv
-data/processed/
 
-# Models
-models/
-*.pkl
 
 # Streamlit
 app/congestion_map.html
