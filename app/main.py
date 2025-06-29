@@ -7,6 +7,8 @@ import pandas as pd
 import pydeck as pdk
 import streamlit.components.v1 as components
 import time
+import os
+from sklearn.ensemble import RandomForestClassifier
 
 # ---------------------- CONFIG ----------------------
 st.set_page_config(page_title="Urban Traffic AI System", layout="centered")
@@ -22,6 +24,48 @@ page = st.sidebar.radio(
         "🚦 Pydeck Signal Animation",
     ],
 )
+
+# ---------------------- FALLBACK MODEL TRAINING ----------------------
+if not os.path.exists("models/model.pkl") or not os.path.exists("models/label_map.pkl"):
+    st.warning("\u26a0\ufe0f Model files not found. Training a fallback model...")
+
+    df_train = pd.read_csv("data/processed/final_processed.csv")
+    df_train = df_train.dropna(subset=["congestion_level", "volume_15min", "hour"])
+    df_train["label"] = df_train["congestion_level"].map(
+        {"Low": 0, "Medium": 1, "High": 2}
+    )
+
+    feature_cols = [
+        "hour",
+        "is_weekend",
+        "is_rush_hour",
+        "volume_15min",
+        "vol_1_19kph",
+        "vol_20_25kph",
+        "vol_26_30kph",
+        "vol_31_35kph",
+        "vol_36_40kph",
+        "vol_41_45kph",
+        "vol_46_50kph",
+        "vol_51_55kph",
+        "vol_56_60kph",
+        "vol_61_65kph",
+        "vol_66_70kph",
+        "vol_71_75kph",
+        "vol_76_80kph",
+        "vol_81_160kph",
+    ]
+    X = df_train[feature_cols]
+    y = df_train["label"]
+
+    model = RandomForestClassifier(n_estimators=50, random_state=42)
+    model.fit(X, y)
+
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(model, "models/model.pkl")
+    joblib.dump({"Low": 0, "Medium": 1, "High": 2}, "models/label_map.pkl")
+
+    st.success("✅ Fallback model trained and saved.")
 
 # ---------------------- MODEL LOADING ----------------------
 model = joblib.load("models/model.pkl")
@@ -73,9 +117,10 @@ if page == "Congestion Predictor":
 # ---------------------- PAGE 2: Signal Optimizer ----------------------
 elif page == "Signal Optimizer":
     st.title("🚥 Signal Timing Optimizer")
-    st.markdown(
-        "Enter traffic volumes from each direction to calculate optimal green time allocation for a 120s cycle."
-    )
+    st.markdown("""
+        Enter traffic volumes from each direction to calculate optimal green time allocation
+        for a 120s cycle.
+    """)
 
     vol_N = st.number_input("North Volume", min_value=0, value=50)
     vol_E = st.number_input("East Volume", min_value=0, value=80)
@@ -113,7 +158,6 @@ elif page == "Signal Optimizer":
         for direction in traffic_volume:
             st.write(f"**{direction}:** {green_time[direction].varValue:.2f} seconds")
 
-
 # ---------------------- PAGE 3: Congestion Map View ----------------------
 elif page == "🌍 Congestion Map View":
     st.title("Congestion Map")
@@ -142,15 +186,12 @@ elif page == "🌍 Congestion Map View":
             ).add_to(m)
 
         m.save("app/congestion_map.html")
-
         with open("app/congestion_map.html", "r", encoding="utf-8") as f:
             map_html = f.read()
         components.html(map_html, height=600, scrolling=True)
 
     except Exception as e:
-        st.error(
-            "Failed to load map. Make sure data/processed/final_processed.csv exists and contains lat/long."
-        )
+        st.error("Failed to load map. Ensure final_processed.csv has lat/lon columns.")
         st.exception(e)
 
 # ---------------------- PAGE 4: Pydeck Animated Signals ----------------------
@@ -167,7 +208,6 @@ elif page == "🚦 Pydeck Signal Animation":
     df = pd.DataFrame(intersections)
 
     green_time = st.slider("Green Time Per Signal (seconds)", 3, 10, 5)
-
     current = int(time.time() / green_time) % len(df)
     df["color"] = [[0, 255, 0] if i == current else [255, 0, 0] for i in range(len(df))]
 
