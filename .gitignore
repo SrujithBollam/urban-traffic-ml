@@ -1,6 +1,23 @@
+# Byte-compiled / cache files
 __pycache__/
-*.pyc
+*.py[cod]
+*.ipynb_checkpoints
+
+# Environment files
 .env
-models/
+*.env
+
+# Data
+data/raw/toronto_speed_2020_2024.csv
 data/processed/
+
+# Models
+models/
+*.pkl
+
+# Streamlit
+app/congestion_map.html
+
+# System files
 .DS_Store
+Thumbs.db
